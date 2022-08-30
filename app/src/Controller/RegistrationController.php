@@ -61,6 +61,10 @@ class RegistrationController extends ContentController
             $member->Password = $password;
             $member->write();
 
+            // HERE IS OUR UPDATE 👇
+            $member->addToGroupByCode("reviewers");
+            $member->write();
+
             $form->sessionMessage('Registration successful', 'good');
         }
 
