@@ -2,7 +2,9 @@
 
 namespace App\Model;
 
+use App\Admin\ReviewAdmin;
 use SilverStripe\ORM\DataObject;
+use SilverStripe\Security\Permission;
 
 class Author extends DataObject
 {
@@ -60,5 +62,25 @@ class Author extends DataObject
         }
 
         return parent::getTitle();
+    }
+
+    public function canView($member = null)
+    {
+        return Permission::check('CMS_ACCESS_' . ReviewAdmin::class, 'any', $member);
+    }
+
+    public function canEdit($member = null)
+    {
+        return Permission::check('CMS_ACCESS_' . ReviewAdmin::class, 'any', $member);
+    }
+
+    public function canDelete($member = null)
+    {
+        return Permission::check('CMS_ACCESS_' . ReviewAdmin::class, 'any', $member);
+    }
+
+    public function canCreate($member = null, $context = [])
+    {
+        return Permission::check('CMS_ACCESS_' . ReviewAdmin::class, 'any', $member);
     }
 }
