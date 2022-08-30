@@ -42,6 +42,28 @@ class RegistrationController extends ContentController
 
     public function doRegister($data, Form $form)
     {
-        // To be detailed later
+        // Make sure we have all the data we need
+        $alias = $data['alias'] ?? null;
+        $email = $data['email'] ?? null;
+        $password = $data['password'] ?? null;
+
+        /*
+         * Check if the fields clear their validation rules.
+         * If there are errors, then the form will be updated with the errors
+         * so the user may correct them.
+         */
+        $validationResults = $form->validationResult();
+
+        if ($validationResults->isValid()) {
+            $member = Member::create();
+            $member->FirstName = $alias;
+            $member->Email = $email;
+            $member->Password = $password;
+            $member->write();
+
+            $form->sessionMessage('Registration successful', 'good');
+        }
+
+        return $this->redirectBack();
     }
 }
