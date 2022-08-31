@@ -1,0 +1,9 @@
+---
+Name: approutes
+After:
+  - '#rootroutes'
+  - '#coreroutes'
+---
+SilverStripe\Control\Director:
+  rules:
+    'review': 'App\Controller\ReviewController'
