@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Admin\ReviewAdmin;
+use App\Model\Author; // <-- This is new
+use App\Model\Book; // <-- This is new
 use App\Service\GoogleBookParser;
 use GuzzleHttp\Client;
 use SilverStripe\CMS\Controllers\ContentController;
@@ -13,7 +15,8 @@ use SilverStripe\Security\Permission;
 class ReviewController extends ContentController
 {
     private static $allowed_actions = [
-        'index',
+        'index', // this action is normally inferred, let's add it explicitly
+        'book'  // We add the "book" action as an allowed action.
     ];
 
     public function index(HTTPRequest $request)
@@ -65,6 +68,72 @@ class ReviewController extends ContentController
                 ->renderWith('Layout/Books'),
 
         ])->renderWith(['Page']);
+    }
+
+    // Add the book-method. This method will be called if the user requests `/review/book/{$volumeId}`.
+    public function book(HTTPRequest $request)
+    {
+        $volumeId = $request->param('ID'); // This retrieves the ID-parameter from the url.
+
+        // Next we query the Google Books API to get the book details.
+        $client = new Client();
+        $response = $client->request('GET', 'https://www.googleapis.com/books/v1/volumes/' . $volumeId);
+        $responseContent = json_decode($response->getBody()->getContents(), true);
+        $googleBook = GoogleBookParser::parse($responseContent);
+
+        // We create new Author objects and store them if they do not currently exist in our database.
+        $authors = [];
+        foreach ($googleBook["authors"] as $googleAuthor) {
+            $author = Author::get()->filter(['Name' => $googleAuthor->AuthorName])->first();
+
+            if (!$author) {
+                $author = Author::create();
+                $author->Name = $googleAuthor->AuthorName;
+
+                $names = explode(" ", $googleAuthor->AuthorName);
+                $author->GivenName = $names[0];
+                if (count($names) > 2) {
+                    $additionalName = "";
+
+                    for ($i = 1; $i < count($names) - 1; $i++) {
+                        $additionalName .= $names[$i] . " ";
+                    }
+
+                    $author->AdditionalName = $additionalName;
+                }
+                $author->FamilyName = $names[count($names) - 1];
+
+                $author->write();
+
+                $authors[] = $author;
+            }
+        }
+
+        // We create a new Book object and store it in our database (if it doesn't exist already).
+        $book = Book::get()->filter(['VolumeID' => $volumeId])->first();
+        if (!$book) {
+            $book = Book::create();
+            $book->VolumeID = $volumeId;
+            $book->Title = $googleBook["title"];
+            $book->ISBN = $googleBook["isbn"];
+            $book->Description = $googleBook["description"];
+
+            foreach ($authors as $author) {
+                $book->Authors()->add($author);
+            }
+
+            $book->write();
+        }
+
+        // We return a response which will be rendered with a new layout called 'Review'.
+        return $this->customise([
+            'Layout' => $this
+                ->customise([
+                    'Book' => $googleBook,
+                ])
+                ->renderWith('Layout/Review'),
+        ])->renderWith(['Page']);
+
     }
 
     /**
