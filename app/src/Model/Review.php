@@ -39,6 +39,16 @@ class Review extends DataObject
         parent::populateDefaults();
     }
 
+    public function getRatingStars()
+    {
+        $rating = $this->Rating;
+        $stars = '';
+        for ($i = 1; $i <= $rating; $i++) {
+            $stars .= '⭐';
+        }
+        return $stars;
+    }
+
     public function validate()
     {
         $result = parent::validate();
