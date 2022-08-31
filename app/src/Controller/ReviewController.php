@@ -2,11 +2,13 @@
 
 namespace App\Controller;
 
+use App\Admin\ReviewAdmin;
 use App\Service\GoogleBookParser;
 use GuzzleHttp\Client;
 use SilverStripe\CMS\Controllers\ContentController;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\ORM\ArrayList;
+use SilverStripe\Security\Permission;
 
 class ReviewController extends ContentController
 {
@@ -137,4 +139,14 @@ class ReviewController extends ContentController
 
         return $pagination;
     }
+
+    public function init()
+    {
+        parent::init();
+
+        if(!Permission::check('CMS_ACCESS_' . ReviewAdmin::class)) {
+            return $this->redirect('/Security/login?BackURL=' . $this->request->getURL());
+        }
+    }
+
 }
