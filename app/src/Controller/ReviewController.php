@@ -5,18 +5,29 @@ namespace App\Controller;
 use App\Admin\ReviewAdmin;
 use App\Model\Author; // <-- This is new
 use App\Model\Book; // <-- This is new
+use App\Model\Review;
 use App\Service\GoogleBookParser;
 use GuzzleHttp\Client;
 use SilverStripe\CMS\Controllers\ContentController;
 use SilverStripe\Control\HTTPRequest;
+use SilverStripe\Forms\DropdownField;
+use SilverStripe\Forms\FieldList;
+use SilverStripe\Forms\Form;
+use SilverStripe\Forms\FormAction;
+use SilverStripe\Forms\HiddenField;
+use SilverStripe\Forms\RequiredFields;
+use SilverStripe\Forms\TextareaField;
+use SilverStripe\Forms\TextField;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\Security\Permission;
+use SilverStripe\Security\Security;
 
 class ReviewController extends ContentController
 {
     private static $allowed_actions = [
         'index', // this action is normally inferred, let's add it explicitly
-        'book'  // We add the "book" action as an allowed action.
+        'book',  // We add the "book" action as an allowed action.
+        'ReviewForm'    // We add the "ReviewForm" action as an allowed action.
     ];
 
     public function index(HTTPRequest $request)
@@ -134,6 +145,99 @@ class ReviewController extends ContentController
                 ->renderWith('Layout/Review'),
         ])->renderWith(['Page']);
 
+    }
+
+    public function ReviewForm()
+    {
+        // The Form is rendered on a page where an ID parameter is present. We will fetch a Book object from the database based on the ID.
+        $volumeId = $this->request->param('ID');
+        $book = Book::get()->filter(['VolumeID' => $volumeId])->first();
+
+        // If the current user has reviewed the book before, we will fetch the review from the database.
+        // This allows us to pre-fill the form with the user's previous review.
+        $currentUser = Security::getCurrentUser();
+        $review = Review::get()->filter([
+            'MemberID' => $currentUser->ID,
+            'BookID' => $book->ID ?? 0
+        ])->first();
+
+        // We create a list of fields for the form.
+        $fields = new FieldList(
+            [
+                // This field holds a ID for the review if it already exists. (This lets us update the review instead of creating a new one.)
+                HiddenField::create(
+                    'ReviewId',
+                    'ReviewId',
+                    $review ? $review->ID : null
+                ),
+
+                // This field holds the ID of the book. It's required so we can store a relation to the book that the review is for.
+                HiddenField::create(
+                    'VolumeId',
+                    'VolumeId',
+                    $volumeId
+                ),
+
+                // The next 3 fields are the review itself - a heading (title), a rating and a review (the text body).
+                TextField::create(
+                    'Title',
+                    'Title',
+                    $review ? $review->Title : null
+                ),
+                DropdownField::create(
+                    'Rating',
+                    'Rating',
+                    [
+                        '1' => 1,
+                        '2' => 2,
+                        '3' => 3,
+                        '4' => 4,
+                        '5' => 5
+                    ]
+                )->setValue($review ? $review->Rating : null),
+                TextareaField::create(
+                    'Review',
+                    'Review',
+                    $review ? $review->Review : null
+                )
+            ]
+        );
+
+        // We create a form connected to this controller and give it a name 'ReviewForm'
+        // and pass the fields we created above.
+        // We also create a new field list which creates a submit button named `Submit` and "connect" it with the method 'doReview'. It also controls that the required fields are filled.
+        $form = Form::create(
+            $this,
+            'ReviewForm',
+            $fields,
+            new FieldList(
+                FormAction::create('doReview', 'Submit')),
+            new RequiredFields('Title', 'Rating'));
+
+        // Normally the form would suffice as it is if this was based on a Page-object, but we are not, so we will set the form-action to the URL that will handle the form submission instead.
+        $form->setFormAction('/review/ReviewForm/');
+
+        return $form;
+    }
+
+    // This is the method tasked with handling the form submission.
+    public function doReview($data, Form $form)
+    {
+        $book = Book::get()->filter(['VolumeID' => $data['VolumeId']])->first();
+
+        // If a review already exists, the form will have a ReviewId field with the ID for it. Otherwise we create a new review.
+        $review = $data['ReviewId'] ? Review::get_by_id($data['ReviewId']) : Review::create();
+
+        // We set the review's properties based on the form data and save it.
+        $review->Title = $data['Title'];
+        $review->Rating = $data['Rating'];
+        $review->Review = $data['Review'];
+        $review->Member = Security::getCurrentUser();
+        $review->Book = $book;
+        $review->write();
+
+        $form->sessionMessage('Your review has been saved', 'good');
+        return $this->redirectBack();
     }
 
     /**
