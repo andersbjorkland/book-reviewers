@@ -7,3 +7,4 @@ After:
 SilverStripe\Control\Director:
   rules:
     'review': 'App\Controller\ReviewController'
+    'book': 'App\Controller\BookController'

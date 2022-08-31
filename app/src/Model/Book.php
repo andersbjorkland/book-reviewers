@@ -25,6 +25,35 @@ class Book extends DataObject
         'Authors' => Author::class
     ];
 
+    private static $casting = [
+        'DescriptionHTML' => 'HTMLText'
+    ];
+
+    public function DescriptionHTML()
+    {
+        return $this->Description;
+    }
+
+    public function getAverageRating()
+    {
+        $reviews = $this->Reviews();
+        $total = 0;
+        foreach ($reviews as $review) {
+            $total += $review->Rating;
+        }
+        return $total / $reviews->count();
+    }
+
+    public function getAverageRatingStars()
+    {
+        $rating = $this->getAverageRating();
+        $stars = '';
+        for ($i = 1; $i <= $rating; $i++) {
+            $stars .= '⭐';
+        }
+        return $stars;
+    }
+
     public function canView($member = null)
     {
         return Permission::check('CMS_ACCESS_' . ReviewAdmin::class, 'any', $member);
